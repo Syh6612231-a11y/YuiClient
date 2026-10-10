@@ -8,6 +8,7 @@ PORT = 8888
 
 
 def main():
+    input_mode = 1 # 切换输入模式
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # ===== 加载 Qwen3-ASR 模型 =====
     print("正在加载 Qwen3-ASR 模型...")
@@ -25,7 +26,13 @@ def main():
         print("输入消息发送给服务器，输入 quit 断开连接。")
 
         while True:
-            text = voice2text.v2t(asr_model)
+            if input_mode == 1:
+                text = input("请输入: ")   # 读取键盘输入
+                if text == "":
+                    print("text为空")
+                    continue
+            elif input_mode == 2:
+                text = voice2text.v2t(asr_model)
             if text == "quit":
                 client_socket.sendall("6.18.\n".encode("utf-8"))
                 print("[客户端] 已发送断开请求")
