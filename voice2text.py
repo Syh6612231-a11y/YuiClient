@@ -6,21 +6,8 @@ from pathlib import Path
 def v2t(model):
     # 获取识别器
     recognizer = sr.Recognizer()
-    recognizer.pause_threshold = 1.5 # 停止说话之后1.5秒视为结束输入
+    recognizer.pause_threshold = 2 # 停止说话之后1.5秒视为结束输入
     mic = sr.Microphone(sample_rate=16000)
-    """
-    # ===== 加载 Qwen3-ASR 模型 =====
-    print("正在加载 Qwen3-ASR 模型...")
-    model_dir = Path("voice2text/Qwen3-ASR-1___7B")
-    asr_model = Qwen3ASRModel.from_pretrained(
-        str(model_dir),
-        dtype=torch.bfloat16,
-        device_map="cuda:0",
-        max_new_tokens=256,
-    )
-
-    print("模型加载完成！")
-    """
     with mic as source:
         print("正在校准环境噪音，请保持安静 1 秒...")
         recognizer.adjust_for_ambient_noise(source, duration=1)

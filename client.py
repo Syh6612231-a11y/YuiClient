@@ -3,13 +3,18 @@ import voice2text
 import torch
 from pathlib import Path
 from qwen_asr import Qwen3ASRModel
-HOST = "127.0.0.1"   # 服务端 IP（本机测试用 127.0.0.1）
+import TTS
+import myTools
+import actions
+HOST = "127.0.0.1" # 服务端 IP（本机测试用 127.0.0.1）
 PORT = 8888
 
 
 def main():
-    input_mode = 1 # 切换输入模式
+    text=""
+    input_mode = 2 # 切换输入模式
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    home_status = actions.HomeStatus()
     # ===== 加载 Qwen3-ASR 模型 =====
     print("正在加载 Qwen3-ASR 模型...")
     model_dir = Path("voice2text/Qwen3-ASR-1___7B")
@@ -17,7 +22,7 @@ def main():
         str(model_dir),
         dtype=torch.bfloat16,
         device_map="cuda:0",
-        max_new_tokens=256,
+        max_new_tokens=512,
     )
     print("模型加载完成！")
     try:
@@ -33,14 +38,26 @@ def main():
                     continue
             elif input_mode == 2:
                 text = voice2text.v2t(asr_model)
-            if text == "quit":
-                client_socket.sendall("6.18.\n".encode("utf-8"))
+            if text == "团子拜拜":
+                client_socket.sendall("6.18$".encode("utf-8"))
                 print("[客户端] 已发送断开请求")
                 break
-
+            print(f"玉舟哥哥说：{text}")
             # 发送文本，必须以 \n 结尾
-            client_socket.sendall((text + "\n").encode("utf-8"))
-
+            client_socket.sendall((text + "$").encode("utf-8"))
+            client_socket.sendall((home_status.to_prompt() + "$").encode("utf-8"))
+            reply = myTools.get_a_message(client_socket)
+            control_code_str = myTools.get_a_message(client_socket)
+            print(f"由比滨结衣：{reply}")
+            print(f"控制代码：{control_code_str}")
+            if control_code_str!="":
+                for ch in control_code_str:
+                    code = int(ch)
+                    actions.do_action(home_status, code)
+                print(home_status.to_prompt())
+            # ---------- 调用语音生成 ----------
+            segments = myTools.split_by_chinese(reply, limit=12)
+            TTS.segments2voice(segments)
     except ConnectionRefusedError:
         print("[客户端] 连接被拒绝，请确认服务端已启动")
     except KeyboardInterrupt:
