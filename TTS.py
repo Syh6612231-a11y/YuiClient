@@ -17,7 +17,7 @@ def text2voice(text):
         "prompt_lang": "ja",
         "prompt_text": "よかった一気にありがとう選ぶのなら任せといて私そういうの超得意だから",
     }
-    r = requests.get(url, params=params)
+    r = requests.get(url, params=params, timeout=60)
     r.raise_for_status()
     return r.content   # 这里返回的是二进制的WAV格式
 

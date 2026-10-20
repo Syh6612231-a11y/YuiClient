@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live2D Stage</title>
+  <link rel="stylesheet" href="stage.css" />
+  <script src="vendor/qwebchannel.js"></script>
+</head>
+<body>
+  <div class="backdrop"></div>
+  <canvas id="canvas"></canvas>
+
+  <div class="stage-placeholder" id="placeholder">
+    <div class="halo"><span></span><span></span><span></span></div>
+    <div class="orb" id="orb">
+      <i class="ring"></i>
+      <i class="ring ring-2"></i>
+      <i class="core"></i>
+    </div>
+    <div class="stage-title">Live2D 舞台</div>
+    <div class="stage-hint" id="hint">正在准备舞台…</div>
+  </div>
+
+  <div class="corner">
+    <span class="corner-dot"></span>
+    <span id="stage-state">STANDBY</span>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="stage.js"></script>
+</body>
+</html>
