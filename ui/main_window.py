@@ -84,24 +84,45 @@ class MainWindow(QMainWindow):
     定义好构造函数之后就可以通过类名创建实例了
     """
     # --------------------创建主布局--------------------
-    def _build_ui(self) -> None:
-        root = QWidget()
-        root.setObjectName("Root")
-        self.setCentralWidget(root)
+    def _build_ui(self) -> None: #只有一个参数就是self（当前创建的实例）
+        root = QWidget() # 创建一个普通的 QWidget 作为根容器（中心部件）
+        root.setObjectName("Root") # 给这个控件设置对象名 "Root"
+        self.setCentralWidget(root) # 把这个容器挂载到self上，将它设置为中心控件；传入后，root 的父子关系变为窗口的子控件，窗口销毁时自动销毁它。
 
+        # 创建一个垂直布局 QVBoxLayout，并把它安装到 root 上（构造参数 root 即父控件），之后 addLayout / addWidget 加到 layout 里的东西，会从上到下竖排在 root 中。
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(18, 16, 18, 16)
-        layout.setSpacing(12)
-        layout.addLayout(self._build_topbar())
+        layout.setContentsMargins(18, 16, 18, 16) # 设置布局的外边距（内容与容器边缘的空白）：左 18、上 16、右 18、下 16 像素
+        layout.setSpacing(12) # 设置布局内各子项之间的间距为 12 像素。
+        layout.addLayout(self._build_topbar()) # 调用 self._build_topbar()，它返回一个布局对象（比如水平布局），然后 addLayout 把它作为这个垂直布局的第一行加进去。
 
+        """
+        创建一个分栏器 QSplitter，方向为水平（Qt.Horizontal）。
+        分栏器把区域横向分成左右两块，中间有可拖拽的分隔条，用户能手动调整两边宽度。
+        Qt.Horizontal 表示子项左右排列；若是 Qt.Vertical 则上下排列。
+        """
         splitter = QSplitter(Qt.Horizontal)
-        splitter.setHandleWidth(14)
-        splitter.setChildrenCollapsible(False)
-        splitter.addWidget(self._build_stage_card())
-        splitter.addWidget(self._build_chat_card())
+        splitter.setHandleWidth(14) # 设置分隔条（handle）宽度为 14 像素
+        splitter.setChildrenCollapsible(False) # 禁止子项被折叠到 0 宽度
+
+        # ————————————————————调用self当中的两个函数分别创建live2D舞台和聊天框————————————————————
+        splitter.addWidget(self._build_stage_card()) # 先创建live2D舞台添加到控件当中（左侧live2D）
+        splitter.addWidget(self._build_chat_card()) # 再创建聊天框添加到控件当中（右侧聊天框）
+        # —————————————————————————————————————————————————————————————————————————————————
+        """
+        设置第 0 个子项（左侧 stage）的拉伸因子为 58;
+        设置第 1 个子项（右侧 chat）的拉伸因子为 42。
+        窗口放大/缩小时，额外空间按拉伸因子比例分配。58 : 42 表示左右大致按 58% : 42% 分配新增空间。
+        注意：拉伸因子只在有剩余空间需要分配时起作用，不等于初始尺寸。
+        """
         splitter.setStretchFactor(0, 58)
         splitter.setStretchFactor(1, 42)
-        splitter.setSizes([720, 520])
+        splitter.setSizes([720, 520]) # 设置分栏的初始尺寸（像素）：左 720、右 520。
+
+        """
+        把分栏器作为控件加到垂直布局里。
+        第二个参数 1 是拉伸因子：在 QVBoxLayout 中，splitter 的拉伸因子为 1，而顶部栏（addLayout 时没给拉伸因子，默认 0）。
+        效果：窗口变高时，多出来的高度几乎全给分栏器（因为它因子为 1，顶部栏为 0），顶部栏保持自然高度，下方区域撑满剩余空间。这正是典型的“顶部固定栏 + 主体自适应”布局。
+        """
         layout.addWidget(splitter, 1)
 
     # --------------------创建顶部bar--------------------
@@ -136,37 +157,41 @@ class MainWindow(QMainWindow):
         return row
 
     # --------------------创建舞台卡片（live2D）--------------------
+    """
+    这段方法负责构建界面左半部分（stage / 舞台卡片）：标题栏 + Live2D 模型视图 + 底部控制按钮。返回一个 QFrame，由 _build_ui 加到 QSplitter 左侧
+    """
     def _build_stage_card(self) -> QFrame:
-        card = QFrame()
-        card.setObjectName("Card")
-        card.setMinimumWidth(460)
+        card = QFrame() # 创建一个 QFrame 作为卡片容器。QFrame 是 QWidget 的子类，自带边框/外观支持，适合做"卡片"这种视觉分组块。
+        card.setObjectName("Card") # 设置对象名 "Card"，供 QSS 样式表用 #Card { ... } 精确定位（比如设圆角、背景、边框）。调试/测试也能按名查找。
+        card.setMinimumWidth(460) # 卡片最小宽度 460 像素。防止用户把分栏拖得太窄导致内容挤压变形。配合分栏的 setChildrenCollapsible(False) 一起保障最小可读性。
 
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(18, 16, 18, 14)
-        layout.setSpacing(12)
+        layout = QVBoxLayout(card) # 给 card 安装垂直布局，之后加进去的东西从上到下排列。
+        layout.setContentsMargins(18, 16, 18, 14) # 设置布局外边距：左 18、上 16、右 18、下 14（顺序：左、上、右、下）。
+        layout.setSpacing(12) # 布局内子项之间的间距 12 像素。区分：contentsMargins 是整体外围留白，spacing 是子项彼此间隔。
 
-        head = QHBoxLayout()
-        head.setSpacing(8)
+        head = QHBoxLayout() # 创建一个水平布局 head，用于安放顶部标签。
+        head.setSpacing(8) # 标题行内子项间距 8 像素。
 
-        name = QLabel("由比滨结衣")
-        name.setObjectName("StageName")
-        tag = QLabel("LIVE2D")
-        tag.setObjectName("Tag")
+        name = QLabel("由比滨结衣") # 创建标题标签
+        name.setObjectName("StageName") # *对象名 "StageName"，QSS 可据此设置字号/颜色/字体（比如大标题样式）*
+        tag = QLabel("LIVE2D") # 创建一个小标签显示 "LIVE2D"，通常做成"徽章/角标"样式。
+        tag.setObjectName("Tag") # 同上，给该对象命名为“Tag”，QSS 可据此设置字号/颜色/字体（比如大标题样式）
 
         subtitle = QLabel("Cubism 3/4 · WebGL 舞台")
         subtitle.setObjectName("Muted")
 
         head.addWidget(name)
-        head.addWidget(tag, 0, Qt.AlignVCenter)
-        head.addStretch(1)
+        head.addWidget(tag, 0, Qt.AlignVCenter) # 垂直居中对齐。注意这是"对齐方式"参数，控制该控件在所在单元格里怎么对齐。
+        head.addStretch(1) # 插入一个弹性空白，拉伸因子 1。 效果：把左边的 name、tag 和右边的 subtitle 推开——左边的靠左，右边的靠右。这是 Qt 里做"两端对齐"的常用手法。
         head.addWidget(subtitle)
-        layout.addLayout(head)
+        layout.addLayout(head) # 将顶部标签插入到live2D舞台
 
+        """创建live2D外观！！！""" # *****************************************************************************************************************
         self.stage = Live2DView()
         self.stage.model_loaded.connect(self._on_model_loaded)
         self.stage.model_failed.connect(self._on_model_failed)
         layout.addWidget(self.stage, 1)
-
+        """创建live2D外观！！！"""  # *****************************************************************************************************************
         controls = QHBoxLayout()
         controls.setSpacing(8)
 

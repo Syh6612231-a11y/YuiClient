@@ -1,4 +1,8 @@
-"""左侧 Live2D 舞台：QWebEngineView + QWebChannel 桥接。"""
+"""
+左侧 Live2D 舞台：QWebEngineView + QWebChannel 桥接。
+这个文件实现左侧 Live2D 舞台：用 QWebEngineView 承载一个 HTML/WebGL 页面，
+再通过 QWebChannel 在 JS ↔ Python 之间架桥。它对外暴露 play_random_motion()、random_expression()、react() 等方法，供 _build_stage_card 里的按钮调用。
+"""
 
 from __future__ import annotations
 
@@ -13,19 +17,23 @@ from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
+"""导入项目自定义的 AssetServer：一个本地 HTTP 静态资源服务器，用来把 assets/ 下的文件通过 http://127.0.0.1:port/... 提供给网页。"""
 from backend.asset_server import AssetServer
 
 ROOT = Path(__file__).resolve().parents[1]
 MODELS_DIR = ROOT / "assets" / "models"
 
-
+"""
+继承 QObject，因为要被注册进 QWebChannel，必须能承载信号槽。
+前缀 _ 表示模块内部使用，外部不该直接实例化。
+"""
 class _Bridge(QObject):
     """JS -> Python 的回调出口。"""
-
-    ready = Signal(str)
-    failed = Signal(str)
-    logged = Signal(str)
-    tapped = Signal()
+    # 声明 4 个信号，类型标注在括号里
+    ready = Signal(str) # 模型加载成功，携带模型名
+    failed = Signal(str) # 加载失败，携带错误信息
+    logged = Signal(str) #JS 端日志转发
+    tapped = Signal() # 用户点击模型（无参数）
 
     @Slot(str)
     def onReady(self, name: str) -> None:  # noqa: N802 - 与 JS 端约定名称
@@ -43,7 +51,7 @@ class _Bridge(QObject):
     def onTap(self) -> None:  # noqa: N802
         self.tapped.emit()
 
-
+"""下面就是live2D舞台的类了，非常非常重要！！！"""
 class Live2DView(QWidget):
     """承载 Live2D 网页舞台，并提供动作、表情、Toast 等调用接口。"""
 
