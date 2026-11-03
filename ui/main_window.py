@@ -22,7 +22,7 @@ from backend.voice_service import VoiceService
 from myTools import split_by_chinese
 from ui.chat_panel import ChatPanel
 from ui.live2d_view import Live2DView
-
+# 这里不是实际控制动作的地方，只是提供一个人类可读的标签
 ACTION_LABELS = {
     0: "待机",
     1: "开灯",
@@ -34,18 +34,32 @@ ACTION_LABELS = {
     7: "打扫卫生",
 }
 
-
+"""
+MainWindow 是整个应用的总控器（Controller），它本身不实现具体功能，而是：
+1. 搭建 UI 布局（顶部状态栏 + 左右分栏）
+2. 持有并协调若干后端组件：ChatWorker（对话）、VoiceService（语音识别）、TTSPlayer（语音合成）、Live2DView（舞台）、ChatPanel（对话面板）
+3. 通过 Qt 的信号槽（signal/slot）机制把各组件串起来
+4. 管理应用生命周期（启动、关闭、资源释放）
+"""
+# 定义一个类 MainWindow，继承自 QMainWindow。QMainWindow 是 Qt 提供的"主窗口"基类，自带菜单栏、工具栏、状态栏、中心部件等布局能力，适合做应用程序主界面。
 class MainWindow(QMainWindow):
+    # 构造函数入口，__init__ 是 Python 对象初始化的特殊方法
     def __init__(
-        self,
-        host: str = "127.0.0.1",
-        port: int = 8888,
-        auto_speak: bool = True,
-        parent=None,
-    ) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("MyDigitalMaid · 对话数字人")
-        self.setMinimumSize(960, 640)
+        self, # 因为这是实例方法，第一个参数必须是实例自身，惯例命名为 self
+        host: str = "127.0.0.1", # 参数 host，类型标注为 str，默认值 "127.0.0.1"
+        port: int = 8888, # 参数 port，类型 int，默认 8888
+        auto_speak: bool = True, # 参数 auto_speak，类型 bool，默认 True。控制是否在收到回复后自动朗读（TTS）
+        parent=None, # Qt 控件的标准 parent 参数，默认 None，表示它是顶层窗口、没有父控件
+    ) -> None: # 参数列表结束，返回值标注为 None（构造函数不返回值）。其实不标注也不会报错，但这样写更规范。
+        """
+        *构造函数从这里开始*
+        self.xxx，可以分成三类：Qt 基类自带的、程序员自定义的、通过继承获得但这里只是调用的.
+        下面的属性都是自定义的，前面加上self是为了区分属性和函数内的普通变量
+        """
+        super().__init__(parent) # 调用父类 QMainWindow.__init__，并把 parent 传进去。Qt 控件必须先完成父类初始化才能使用，否则会崩溃或报错。这里默认传入的是None
+        """先调用父类的构造函数，创建这个界面的地基，下面再初始化我们自定义的参数"""
+        self.setWindowTitle("MyDigitalMaid · 对话数字人") # 设置窗口标题栏文字为 "MyDigitalMaid · 对话数字人"
+        self.setMinimumSize(960, 640) # 设置窗口最小尺寸：宽 960 像素、高 640 像素
         self._host = host
         self._port = port
         self._home = actions.HomeStatus()
@@ -66,8 +80,10 @@ class MainWindow(QMainWindow):
 
         self._start_backend()
         QTimer.singleShot(900, self._greeting)
-
-    # ------------------------------------------------------------------- ui
+    """
+    定义好构造函数之后就可以通过类名创建实例了
+    """
+    # --------------------创建主布局--------------------
     def _build_ui(self) -> None:
         root = QWidget()
         root.setObjectName("Root")
@@ -88,6 +104,7 @@ class MainWindow(QMainWindow):
         splitter.setSizes([720, 520])
         layout.addWidget(splitter, 1)
 
+    # --------------------创建顶部bar--------------------
     def _build_topbar(self) -> QHBoxLayout:
         row = QHBoxLayout()
         row.setSpacing(12)
@@ -118,6 +135,7 @@ class MainWindow(QMainWindow):
         row.addWidget(self.top_status)
         return row
 
+    # --------------------创建舞台卡片（live2D）--------------------
     def _build_stage_card(self) -> QFrame:
         card = QFrame()
         card.setObjectName("Card")
@@ -178,6 +196,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(controls)
         return card
 
+    # --------------------创建聊天框--------------------
     def _build_chat_card(self) -> ChatPanel:
         self.chat = ChatPanel()
         self.chat.send_message.connect(self._on_send)
@@ -364,7 +383,7 @@ class MainWindow(QMainWindow):
         self._greeted = True
         self.chat.add_message(
             "assistant",
-            "玉舟哥哥，晚上好呀～我是结衣。今天也辛苦啦，想聊点什么？",
+            "呀哈啰！团子在这里~o(*￣▽￣*)ブ",
         )
 
     def _interact(self) -> None:

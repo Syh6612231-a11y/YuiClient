@@ -1,5 +1,4 @@
 """本地静态资源服务。
-
 QtWebEngine 里用 file:// 打开页面时，fetch/XHR 加载 .moc3 等模型文件会被
 Chromium 的同源策略拦截。这里在 127.0.0.1 上起一个只读的临时 HTTP 服务，
 让 Live2D 页面和模型资源走正常的 http:// 同源加载。

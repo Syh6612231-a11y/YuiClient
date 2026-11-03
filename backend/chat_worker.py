@@ -13,7 +13,6 @@ import queue
 import random
 import socket
 import time
-
 from PySide6.QtCore import QThread, Signal
 
 FAREWELL_WORDS = ("再见", "拜拜", "晚安", "先这样")
