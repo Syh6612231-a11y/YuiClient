@@ -26,6 +26,11 @@ MODELS_DIR = ROOT / "assets" / "models"
 """
 继承 QObject，因为要被注册进 QWebChannel，必须能承载信号槽。
 前缀 _ 表示模块内部使用，外部不该直接实例化。
+它不画界面、不存业务数据，唯一职责：接收网页 JS 的调用，转成 Qt 信号。
+可以把它想成一个只对外开 4 个"窗口"的对象，网页只能通过这 4 个窗口递消息进来。
+
+网页JS	@Slot 方法 onReady/onError/onLog/onTap	JS能调用的入口
+Python	Signal 信号 ready/failed/logged/tapped	Python能监听的出口
 """
 class _Bridge(QObject):
     """JS -> Python 的回调出口。"""
@@ -52,7 +57,7 @@ class _Bridge(QObject):
         self.tapped.emit()
 
 """下面就是live2D舞台的类了，非常非常重要！！！"""
-class Live2DView(QWidget):
+class Live2DView(QWidget): # python的继承是直接写在括号内的
     """承载 Live2D 网页舞台，并提供动作、表情、Toast 等调用接口。"""
 
     model_loaded = Signal(str)
@@ -64,21 +69,26 @@ class Live2DView(QWidget):
         self._loaded = False
         self._closed = False
 
-        self._server = AssetServer(ROOT)
-        self._view = QWebEngineView(self)
-        self._view.setContextMenuPolicy(Qt.NoContextMenu)
+        self._server = AssetServer(ROOT) # 这里的ROOT在上面定义了，是项目的根目录。
+        self._view = QWebEngineView(self) # 创建内嵌浏览器控件，父对象为 self，生命周期随 Live2DView 一起销毁.
+        self._view.setContextMenuPolicy(Qt.NoContextMenu) # 禁用右键菜单（默认浏览器右键菜单会暴露"重新加载/检查元素"等，不适合正式界面）
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._view)
+        layout = QVBoxLayout(self) # 创建一个列容器来存放live2D
+        layout.setContentsMargins(0, 0, 0, 0) # 边距设置为 0
+        layout.addWidget(self._view)() #将浏览器控件添加到容器内
 
-        settings = self._view.settings()
-        settings.setAttribute(QWebEngineSettings.WebGLEnabled, True)
-        settings.setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, True)
-        settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
-        settings.setAttribute(QWebEngineSettings.PlaybackRequiresUserGesture, False)
+        settings = self._view.settings() # 获取到浏览器控件的settings
+        """初始化浏览器控件设置"""
+        settings.setAttribute(QWebEngineSettings.WebGLEnabled, True) # 开启 WebGL（浏览器里的 3D/GPU 图形 API）
+        settings.setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, True) # 开启 2D Canvas 硬件加速（用 GPU 加速 <canvas> 的 2D 绘制）
+        settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True) # 允许本地内容（file:// 或本地服务提供的页面）发起对远程 URL 的访问（fetch/XHR/加载远程资源）
+        settings.setAttribute(QWebEngineSettings.PlaybackRequiresUserGesture, False) # 允许无需用户交互（点击/按键）就自动播放音视频
 
-        self._bridge = _Bridge(self)
+        """
+        _Bridge 是"网页里的 JavaScript"和"Python 代码"之间的双向通信中转站。
+        它让网页能主动通知 Python（模型加载好了、加载失败、被点击了），从而把网页内部发生的事情变成 Python 世界里的信号。
+        """
+        self._bridge = _Bridge(self) # 创建Bridge——用来链接JS
         self._bridge.ready.connect(self._on_model_ready)
         self._bridge.failed.connect(self._on_model_failed)
         self._bridge.tapped.connect(lambda: self.react())
@@ -143,7 +153,9 @@ class Live2DView(QWidget):
         self._view.page().runJavaScript(script)
 
     def play_random_motion(self) -> None:
+        # 这个字符串是一段 JavaScript 代码，会被 _run 送进网页里执行。它不是 Python，也不是文件路径，而是要在 QWebEngineView 加载的 HTML 页面的 JS 环境里运行的脚本
         self._run("window.Live2DStage && window.Live2DStage.randomMotion()")
+        # 先获取到浏览器上面的那个“window.Live2DStage”对象然后再执行它的randomMotion()方法播放一个随机动作
 
     def random_expression(self) -> None:
         self._run("window.Live2DStage && window.Live2DStage.randomExpression()")
