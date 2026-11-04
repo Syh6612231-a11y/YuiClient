@@ -75,7 +75,7 @@ class Live2DView(QWidget): # python的继承是直接写在括号内的
 
         layout = QVBoxLayout(self) # 创建一个列容器来存放live2D
         layout.setContentsMargins(0, 0, 0, 0) # 边距设置为 0
-        layout.addWidget(self._view)() #将浏览器控件添加到容器内
+        layout.addWidget(self._view) #将浏览器控件添加到容器内
 
         settings = self._view.settings() # 获取到浏览器控件的settings
         """初始化浏览器控件设置"""
@@ -99,8 +99,14 @@ class Live2DView(QWidget): # python的继承是直接写在括号内的
 
         self._view.loadFinished.connect(self._on_load_finished)
         self._view.load(QUrl(self._page_url()))
-
+    """
+    这段代码是一个 Live2D 虚拟形象（看板娘）的 PyQt/QWebEngine 集成类 的一部分。它负责在桌面应用里内嵌一个网页来渲染 Live2D 模型，并对外提供控制接口。
+    """
     # ------------------------------------------------------------- lifecycle
+    """
+    构建网页的url，基础地址是 web/live2d.html，
+    然后调用 _find_model() 找到模型文件；找到的话，把模型路径 URL 编码后作为 ?model= 查询参数拼到地址上。这样网页就能知道该加载哪个 Live2D 模型
+    """
     def _page_url(self) -> str:
         page = self._server.url("web/live2d.html")
         model = self._find_model()
@@ -109,6 +115,9 @@ class Live2DView(QWidget): # python的继承是直接写在括号内的
             page += "?model=" + urllib.parse.quote(self._server.url(relative), safe="")
         return page
 
+    """
+    查找要用的live2D模型
+    """
     def _find_model(self) -> Path | None:
         override = os.environ.get("MYDIGITALMAID_MODEL")
         if override:
@@ -127,19 +136,31 @@ class Live2DView(QWidget): # python的继承是直接写在括号内的
                 return models[0]
         return None
 
+    """
+    网页加载完成时的回调。记录加载状态 _loaded；失败则发出 model_failed 信号（"Live2D 页面加载失败"）
+    """
     def _on_load_finished(self, ok: bool) -> None:
         self._loaded = ok
         if not ok:
             self.model_failed.emit("Live2D 页面加载失败")
 
+    """
+    网页端通知"模型加载成功"的回调：打印日志并发出 model_loaded 信号，把模型名传出去
+    """
     def _on_model_ready(self, name: str) -> None:
         print(f"[Live2D] 模型已加载：{name}")
         self.model_loaded.emit(name)
 
+    """
+    网页端通知"模型加载失败"的回调：打印日志并发出 model_failed 信号
+    """
     def _on_model_failed(self, message: str) -> None:
         print(f"[Live2D] 加载失败：{message}")
         self.model_failed.emit(message)
 
+    """
+    关闭时调用，防止重复执行（_closed 标志），停掉内部 HTTP 服务器 _server
+    """
     def shutdown(self) -> None:
         if self._closed:
             return
@@ -153,9 +174,8 @@ class Live2DView(QWidget): # python的继承是直接写在括号内的
         self._view.page().runJavaScript(script)
 
     def play_random_motion(self) -> None:
-        # 这个字符串是一段 JavaScript 代码，会被 _run 送进网页里执行。它不是 Python，也不是文件路径，而是要在 QWebEngineView 加载的 HTML 页面的 JS 环境里运行的脚本
-        self._run("window.Live2DStage && window.Live2DStage.randomMotion()")
-        # 先获取到浏览器上面的那个“window.Live2DStage”对象然后再执行它的randomMotion()方法播放一个随机动作
+        # 手动按钮强制播放，不受自动动作冷却限制
+        self._run("window.Live2DStage && window.Live2DStage.randomMotion(true)")
 
     def random_expression(self) -> None:
         self._run("window.Live2DStage && window.Live2DStage.randomExpression()")

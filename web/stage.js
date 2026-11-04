@@ -6,6 +6,10 @@
   const params = new URLSearchParams(window.location.search);
   const modelUrl = (params.get("model") || "").trim();
 
+  // 动作节奏：自动动作的最小间隔（毫秒）；播放速度（1 = 原速，0.9 = 慢 10%）
+  const MOTION_COOLDOWN_MS = 3500;
+  const MOTION_SPEED = 0.9;
+
   const state = {
     app: null,
     model: null,
@@ -14,6 +18,7 @@
     speaking: false,
     mouth: 0,
     mouthTarget: 0,
+    lastMotionAt: 0,
     toastTimer: 0,
   };
 
@@ -122,10 +127,16 @@
     model.y = height * 0.505;
   }
 
-  function playRandomMotion() {
+  function playRandomMotion(force = false) {
     const model = state.model;
     if (!model) {
       pulse();
+      return;
+    }
+
+    // 自动动作在冷却时间内不再打断当前动作；手动按钮传 force=true 跳过
+    const now = performance.now();
+    if (!force && now - state.lastMotionAt < MOTION_COOLDOWN_MS) {
       return;
     }
 
@@ -141,6 +152,7 @@
       const pool = preferred.length ? preferred : groups;
       const group = pool[Math.floor(Math.random() * pool.length)];
       const count = definitions[group].length;
+      state.lastMotionAt = now;
       model.motion(group, Math.floor(Math.random() * count), 3);
     } catch (error) {
       console.warn("motion failed", error);
@@ -158,7 +170,7 @@
       const settings = (model.internalModel && model.internalModel.settings) || {};
       const expressions = settings.expressions || [];
       if (!expressions.length) {
-        playRandomMotion();
+        playRandomMotion(true);
         return;
       }
       model.expression(Math.floor(Math.random() * expressions.length));
@@ -179,9 +191,7 @@
   function setSpeaking(speaking) {
     state.speaking = Boolean(speaking);
     document.body.classList.toggle("speaking", state.speaking);
-    if (state.speaking) {
-      playRandomMotion();
-    } else {
+    if (!state.speaking) {
       state.mouthTarget = 0;
     }
   }
@@ -211,6 +221,16 @@
     const model = await PIXI.live2d.Live2DModel.from(url, { autoInteract: true });
     state.model = model;
     app.stage.addChild(model);
+
+    // 放慢动作播放速度（只影响动作时间轴，不影响口型/眨眼）
+    if (MOTION_SPEED !== 1) {
+      const manager = model.internalModel && model.internalModel.motionManager;
+      if (manager && typeof manager.update === "function") {
+        const originalUpdate = manager.update.bind(manager);
+        manager.update = (coreModel, deltaTime) =>
+          originalUpdate(coreModel, deltaTime * MOTION_SPEED);
+      }
+    }
 
     fitModel();
     window.addEventListener("resize", fitModel);
@@ -268,7 +288,9 @@
   }
 
   window.Live2DStage = {
-    randomMotion: playRandomMotion,
+    randomMotion(force = false) {
+      playRandomMotion(force);
+    },
     randomExpression,
     react() {
       pulse();
