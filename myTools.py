@@ -28,9 +28,8 @@ def split_by_chinese(text, limit=15):
     if buf:
         segments.append(buf)
     return segments
-def get_a_message(client_socket):
+def get_a_message(client_socket,recv_buf):
     # 循环接收直到拿到一行完整回复
-    recv_buf = b""
     while b"$" not in recv_buf:
         chunk = client_socket.recv(2048)
         if not chunk:
@@ -38,4 +37,4 @@ def get_a_message(client_socket):
             return
         recv_buf += chunk
     line, recv_buf = recv_buf.split(b"$", 1)
-    return line.decode("utf-8")
+    return line.decode("utf-8"), recv_buf

@@ -1,3 +1,4 @@
+import os
 import io
 import wave
 import queue
@@ -8,14 +9,26 @@ import sounddevice as sd
 
 
 # ========== 1. 请求 TTS，返回 WAV bytes ==========
-def text2voice(text):
+def text2voice(text,sentiment_label,sentiment_confidence):
     url = "http://127.0.0.1:9880/tts"
+    if float(sentiment_confidence)<0.4:
+        sentiment_level = "low"
+    elif 0.4 <= float(sentiment_confidence) < 0.6:
+        sentiment_level = "middle"
+    else:
+        sentiment_level = "high"
+    with open("refVoice/"+sentiment_label+"/"+sentiment_label+"_"+sentiment_level+".txt", "r", encoding="utf-8") as f:
+        prompt_text = f.read().strip()  # strip() 去掉首尾空白/换行
+    """API里必须填绝对地址"""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    print(current_dir)
+    ref_audio_path = current_dir+"/refVoice/"+sentiment_label+"/"+sentiment_label+"_"+sentiment_level+".wav"
     params = {
         "text": text,
         "text_lang": "zh",
-        "ref_audio_path": "D:/Python_project/Yui/refVoice/happy/happy(L).wav",
+        "ref_audio_path": ref_audio_path,
         "prompt_lang": "ja",
-        "prompt_text": "よかった一気にありがとう選ぶのなら任せといて私そういうの超得意だから",
+        "prompt_text": prompt_text,
     }
     r = requests.get(url, params=params)
     r.raise_for_status()
@@ -113,7 +126,7 @@ def _playback_worker(samplerate, channels, block_ms=50):
 
 
 # ========== 5. 主入口：切片 → 流式连续播放 ==========
-def segments2voice(segments):
+def segments2voice(segments,sentiment_label,sentiment_confidence):
     """
     把所有切片音频写入同一个持续打开的音频流，
     段与段之间无开关延迟，听感像一整段话。
@@ -143,7 +156,7 @@ def segments2voice(segments):
 
     # ---- 先请求第一段，用于确定采样率和声道数 ----
     try:
-        first_bytes = text2voice(segments[0])
+        first_bytes = text2voice(segments[0],sentiment_label,sentiment_confidence)
         first_audio, samplerate, channels = _wav_bytes_to_numpy(first_bytes)
         print(f"[1/{total}] 播放：{segments[0]}")
     except Exception as e:
@@ -170,7 +183,7 @@ def segments2voice(segments):
             if _stop_flag.is_set():
                 break
             try:
-                audio_bytes = text2voice(seg)
+                audio_bytes = text2voice(seg,sentiment_label,sentiment_confidence)
                 arr, sr, ch = _wav_bytes_to_numpy(audio_bytes)
                 if sr != samplerate:
                     print(f"警告：第 {idx} 段采样率 {sr} != {samplerate}，可能变调")

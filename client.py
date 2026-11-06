@@ -43,13 +43,19 @@ def main():
                 print("[客户端] 已发送断开请求")
                 break
             print(f"玉舟哥哥说：{text}")
-            # 发送文本，必须以 \n 结尾
+            # 发送文本，必须以 $ 结尾
             client_socket.sendall((text + "$").encode("utf-8"))
             client_socket.sendall((home_status.to_prompt() + "$").encode("utf-8"))
-            reply = myTools.get_a_message(client_socket)
-            control_code_str = myTools.get_a_message(client_socket)
+            # 接收缓存必须定义在外层，不然会丢失信息
+            recv_buf = b""
+            reply,recv_buf = myTools.get_a_message(client_socket,recv_buf)
+            control_code_str,recv_buf = myTools.get_a_message(client_socket,recv_buf)
+            sentiment_label,recv_buf = myTools.get_a_message(client_socket,recv_buf) # 接收情感标签
+            sentiment_confidence,recv_buf = myTools.get_a_message(client_socket,recv_buf) # 接收情感标签可信度（这是一个浮点数，需要做类型转换）
             print(f"由比滨结衣：{reply}")
             print(f"控制代码：{control_code_str}")
+            print(f"情感标签：{sentiment_label}")
+            print(f"情感可信度{sentiment_confidence}")
             if control_code_str!="":
                 for ch in control_code_str:
                     code = int(ch)
@@ -57,7 +63,7 @@ def main():
                 print(home_status.to_prompt())
             # ---------- 调用语音生成 ----------
             segments = myTools.split_by_chinese(reply, limit=12)
-            TTS.segments2voice(segments)
+            TTS.segments2voice(segments,"happiness",sentiment_confidence)
     except ConnectionRefusedError:
         print("[客户端] 连接被拒绝，请确认服务端已启动")
     except KeyboardInterrupt:
