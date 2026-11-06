@@ -1,1 +1,4 @@
 voice2text/
+__pycache__/
+.runtime/
+.acl-recovery/
